@@ -1,20 +1,49 @@
+
 import java.net.ServerSocket;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.Socket;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatServer {
-  public static void main(String[] args) throws Exception{
-    ServerSocket server = new ServerSocket(5000);
 
-    System.out.println("Chat server started on port 5000");
-    while (true) {
-      Socket client = server.accept();
+    private static final int PORT = 5000;
 
-      System.out.println("Client connected");
+    private static final Set<ClientHandler> clients =
+            ConcurrentHashMap.newKeySet();
 
-      ClientHandler handler = new ClientHandler(client);
-      handler.start();
+    public static void main(String[] args) {
+
+        System.out.println("Chat server starting...");
+
+        try (ServerSocket server = new ServerSocket(PORT)) {
+
+            System.out.println("Server running on port " + PORT);
+
+            while (true) {
+
+                Socket socket = server.accept();
+
+                System.out.println("New client connected!");
+
+                ClientHandler handler =
+                        new ClientHandler(socket, clients);
+
+                clients.add(handler);
+                handler.start();
+            }
+
+        } catch (Exception e) {
+            System.out.println("Server error: " + e.getMessage());
+        }
     }
-  }
+
+    public static void broadcast(
+            String message,
+            ClientHandler sender,
+            Set<ClientHandler> clients) {
+
+        for (ClientHandler client : clients) {
+            client.sendMessage(message);
+        }
+    }
 }

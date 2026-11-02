@@ -1,5 +1,10 @@
+
+import javax.swing.SwingUtilities;
+
 public class Main {
-  public static void main(String[] args){
-    System.out.println("Java LAN Chat - Project!!");
-  }
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            new ChatClient();
+        });
+    }
 }
