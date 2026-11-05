@@ -1,17 +1,19 @@
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.net.Socket;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class ChatClient extends JFrame {
 
     private JTextArea chatArea;
-    private JTextField messageField;
     private JTextField usernameField;
+    private JTextField serverField;
+    private JTextField messageField;
 
     private JButton connectButton;
     private JButton sendButton;
@@ -20,60 +22,83 @@ public class ChatClient extends JFrame {
     private PrintWriter output;
     private BufferedReader input;
 
+    private String username;
     private volatile boolean connected = false;
 
     public ChatClient() {
 
         setTitle("Java LAN Chat");
-        setSize(500, 500);
+        setSize(600, 500);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        setLayout(new BorderLayout(10, 10));
+        setLayout(new BorderLayout(8, 8));
 
-        // Top panel
-        JPanel topPanel = new JPanel(new BorderLayout(5, 5));
+        JLabel title = new JLabel("Java LAN Chat");
+        title.setFont(new Font("Arial", Font.BOLD, 20));
+        title.setForeground(Color.WHITE);
+        title.setBorder(BorderFactory.createEmptyBorder(12, 15, 12, 15));
+
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(new Color(45, 55, 70));
+        header.add(title);
+
+        JPanel topPanel = new JPanel(new GridLayout(2, 2, 8, 8));
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         usernameField = new JTextField();
-        usernameField.setToolTipText("Enter username");
+        serverField = new JTextField("10.88.249.221");
 
         connectButton = new JButton("Connect");
 
-        topPanel.add(new JLabel("Username: "), BorderLayout.WEST);
-        topPanel.add(usernameField, BorderLayout.CENTER);
-        topPanel.add(connectButton, BorderLayout.EAST);
+        topPanel.add(new JLabel("Username:"));
+        topPanel.add(usernameField);
+        topPanel.add(new JLabel("Server IP:"));
+        topPanel.add(serverField);
 
-        // Chat area
+        JPanel connectionPanel = new JPanel(new BorderLayout(5, 5));
+        connectionPanel.add(topPanel, BorderLayout.CENTER);
+        connectionPanel.add(connectButton, BorderLayout.SOUTH);
+
         chatArea = new JTextArea();
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
         chatArea.setWrapStyleWord(true);
+        chatArea.setFont(new Font("Arial", Font.PLAIN, 14));
+        chatArea.setBackground(new Color(245, 246, 248));
+        chatArea.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         JScrollPane scrollPane = new JScrollPane(chatArea);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
 
-        // Bottom panel
-        JPanel bottomPanel = new JPanel(new BorderLayout(5, 5));
+        JPanel bottomPanel = new JPanel(new BorderLayout(8, 8));
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         messageField = new JTextField();
-        sendButton = new JButton("Send");
+        messageField.setFont(new Font("Arial", Font.PLAIN, 14));
 
-        sendButton.setEnabled(false);
+        sendButton = new JButton("Send");
+        sendButton.setBackground(new Color(45, 110, 180));
+        sendButton.setForeground(Color.WHITE);
+        sendButton.setFocusPainted(false);
+
         messageField.setEnabled(false);
+        sendButton.setEnabled(false);
 
         bottomPanel.add(messageField, BorderLayout.CENTER);
         bottomPanel.add(sendButton, BorderLayout.EAST);
 
-        add(topPanel, BorderLayout.NORTH);
-        add(scrollPane, BorderLayout.CENTER);
+        add(header, BorderLayout.NORTH);
+
+        JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.add(connectionPanel, BorderLayout.NORTH);
+        centerPanel.add(scrollPane, BorderLayout.CENTER);
+
+        add(centerPanel, BorderLayout.CENTER);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // Connect button
         connectButton.addActionListener(e -> connectToServer());
-
-        // Send button
         sendButton.addActionListener(e -> sendMessage());
-
-        // Enter key sends message
         messageField.addActionListener(e -> sendMessage());
 
         setVisible(true);
@@ -81,73 +106,89 @@ public class ChatClient extends JFrame {
 
     private void connectToServer() {
 
-        String username = usernameField.getText().trim();
+        username = usernameField.getText().trim();
+        String serverIP = serverField.getText().trim();
 
-        if (username.isEmpty()) {
+        if (username.isEmpty() || serverIP.isEmpty()) {
             JOptionPane.showMessageDialog(
-                    this, "Please enter a username.");
+                    this, "Enter username and server IP.");
             return;
         }
 
+        connectButton.setEnabled(false);
+
+        Thread connectionThread = new Thread(() -> {
+
+            try {
+
+                socket = new Socket(serverIP, 5000);
+
+                output = new PrintWriter(
+                        socket.getOutputStream(), true);
+
+                input = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream()));
+
+                output.println(username);
+
+                connected = true;
+
+                SwingUtilities.invokeLater(() -> {
+                    usernameField.setEnabled(false);
+                    serverField.setEnabled(false);
+                    messageField.setEnabled(true);
+                    sendButton.setEnabled(true);
+
+                    chatArea.append("Connected to server!\n");
+                });
+
+                listenForMessages();
+
+            } catch (Exception e) {
+
+                SwingUtilities.invokeLater(() -> {
+                    connectButton.setEnabled(true);
+
+                    JOptionPane.showMessageDialog(
+                            this, "Connection failed: " + e.getMessage());
+                });
+            }
+        });
+
+        connectionThread.setDaemon(true);
+        connectionThread.start();
+    }
+
+    private void listenForMessages() {
+
         try {
 
-            socket = new Socket("localhost", 5000);
+            String message;
 
-            output = new PrintWriter(
-                    socket.getOutputStream(), true);
+            while ((message = input.readLine()) != null) {
 
-            input = new BufferedReader(
-                    new InputStreamReader(socket.getInputStream()));
+                String received = message;
 
-            output.println(username);
+                SwingUtilities.invokeLater(() -> {
 
-            connected = true;
+                    String time = LocalTime.now().format(
+                            DateTimeFormatter.ofPattern("hh:mm a"));
 
-            usernameField.setEnabled(false);
-            connectButton.setEnabled(false);
-            messageField.setEnabled(true);
-            sendButton.setEnabled(true);
-
-            chatArea.append("Connected to server!\n");
-
-            Thread listener = new Thread(() -> {
-
-                try {
-
-                    String message;
-
-                    while ((message = input.readLine()) != null) {
-
-                        String received = message;
-
-                        SwingUtilities.invokeLater(() ->
-                                chatArea.append(received + "\n"));
-                    }
-
-                } catch (Exception e) {
-
-                    SwingUtilities.invokeLater(() ->
-                            chatArea.append("Connection lost.\n"));
-
-                } finally {
-
-                    connected = false;
-
-                    SwingUtilities.invokeLater(() -> {
-                        messageField.setEnabled(false);
-                        sendButton.setEnabled(false);
-                    });
-                }
-            });
-
-            listener.setDaemon(true);
-            listener.start();
+                    chatArea.append("[" + time + "] " + received + "\n");
+                });
+            }
 
         } catch (Exception e) {
 
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Unable to connect to server: " + e.getMessage());
+        } finally {
+
+            connected = false;
+
+            SwingUtilities.invokeLater(() -> {
+                messageField.setEnabled(false);
+                sendButton.setEnabled(false);
+                chatArea.append("Disconnected from server.\n");
+            });
         }
     }
 
@@ -162,14 +203,12 @@ public class ChatClient extends JFrame {
         if (!message.isEmpty()) {
 
             output.println(message);
-
             messageField.setText("");
         }
     }
 
     public static void main(String[] args) {
 
-        SwingUtilities.invokeLater(() ->
-                new ChatClient());
+        SwingUtilities.invokeLater(() -> new ChatClient());
     }
 }
