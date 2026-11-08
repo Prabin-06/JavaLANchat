@@ -41,6 +41,9 @@ public class ClientHandler extends Thread {
 
             broadcast(username + " joined the chat!");
 
+            // Update the online users list
+            ChatServer.updateUsers();
+
             String message;
 
             while ((message = input.readLine()) != null) {
@@ -59,7 +62,11 @@ public class ClientHandler extends Thread {
             clients.remove(this);
 
             if (username != null) {
+
                 broadcast(username + " left the chat!");
+
+                // Update the online users list
+                ChatServer.updateUsers();
             }
 
             try {
@@ -77,8 +84,12 @@ public class ClientHandler extends Thread {
         }
     }
 
+    public String getUsername() {
+        return username;
+    }
+
     private void broadcast(String message) {
 
-        ChatServer.broadcast(message, this, clients);
+        ChatServer.broadcast(message);
     }
 }

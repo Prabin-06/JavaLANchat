@@ -18,6 +18,9 @@ public class ChatClient extends JFrame {
     private JButton connectButton;
     private JButton sendButton;
 
+    private DefaultListModel<String> userListModel;
+    private JList<String> userList;
+
     private Socket socket;
     private PrintWriter output;
     private BufferedReader input;
@@ -28,12 +31,13 @@ public class ChatClient extends JFrame {
     public ChatClient() {
 
         setTitle("Java LAN Chat");
-        setSize(600, 500);
+        setSize(700, 500);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
         setLayout(new BorderLayout(8, 8));
 
+        // Header
         JLabel title = new JLabel("Java LAN Chat");
         title.setFont(new Font("Arial", Font.BOLD, 20));
         title.setForeground(Color.WHITE);
@@ -43,11 +47,12 @@ public class ChatClient extends JFrame {
         header.setBackground(new Color(45, 55, 70));
         header.add(title);
 
+        // Connection panel
         JPanel topPanel = new JPanel(new GridLayout(2, 2, 8, 8));
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         usernameField = new JTextField();
-        serverField = new JTextField("10.88.249.221");
+        serverField = new JTextField("localhost");
 
         connectButton = new JButton("Connect");
 
@@ -60,6 +65,7 @@ public class ChatClient extends JFrame {
         connectionPanel.add(topPanel, BorderLayout.CENTER);
         connectionPanel.add(connectButton, BorderLayout.SOUTH);
 
+        // Chat area
         chatArea = new JTextArea();
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
@@ -68,9 +74,30 @@ public class ChatClient extends JFrame {
         chatArea.setBackground(new Color(245, 246, 248));
         chatArea.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        JScrollPane scrollPane = new JScrollPane(chatArea);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
+        JScrollPane chatScroll = new JScrollPane(chatArea);
 
+        // Online users list
+        userListModel = new DefaultListModel<>();
+        userList = new JList<>(userListModel);
+        userList.setFont(new Font("Arial", Font.PLAIN, 14));
+
+        JPanel usersPanel = new JPanel(new BorderLayout());
+        usersPanel.setPreferredSize(new Dimension(130, 0));
+        usersPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+        JLabel usersTitle = new JLabel("Online Users");
+        usersTitle.setFont(new Font("Arial", Font.BOLD, 14));
+        usersTitle.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
+
+        usersPanel.add(usersTitle, BorderLayout.NORTH);
+        usersPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
+
+        // Main chat section
+        JPanel centerPanel = new JPanel(new BorderLayout(5, 5));
+        centerPanel.add(chatScroll, BorderLayout.CENTER);
+        centerPanel.add(usersPanel, BorderLayout.EAST);
+
+        // Message panel
         JPanel bottomPanel = new JPanel(new BorderLayout(8, 8));
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -89,11 +116,7 @@ public class ChatClient extends JFrame {
         bottomPanel.add(sendButton, BorderLayout.EAST);
 
         add(header, BorderLayout.NORTH);
-
-        JPanel centerPanel = new JPanel(new BorderLayout());
-        centerPanel.add(connectionPanel, BorderLayout.NORTH);
-        centerPanel.add(scrollPane, BorderLayout.CENTER);
-
+        add(connectionPanel, BorderLayout.BEFORE_FIRST_LINE);
         add(centerPanel, BorderLayout.CENTER);
         add(bottomPanel, BorderLayout.SOUTH);
 
@@ -171,14 +194,24 @@ public class ChatClient extends JFrame {
 
                 SwingUtilities.invokeLater(() -> {
 
-                    String time = LocalTime.now().format(
-                            DateTimeFormatter.ofPattern("hh:mm a"));
+                    if (received.startsWith("USERS:")) {
 
-                    chatArea.append("[" + time + "] " + received + "\n");
+                        updateUserList(received.substring(6));
+
+                    } else {
+
+                        String time = LocalTime.now().format(
+                                DateTimeFormatter.ofPattern("hh:mm a"));
+
+                        chatArea.append(
+                                "[" + time + "] " + received + "\n");
+                    }
                 });
             }
 
         } catch (Exception e) {
+
+            // Connection closed
 
         } finally {
 
@@ -188,7 +221,22 @@ public class ChatClient extends JFrame {
                 messageField.setEnabled(false);
                 sendButton.setEnabled(false);
                 chatArea.append("Disconnected from server.\n");
+                userListModel.clear();
             });
+        }
+    }
+
+    private void updateUserList(String users) {
+
+        userListModel.clear();
+
+        String[] usernames = users.split(",");
+
+        for (String name : usernames) {
+
+            if (!name.isEmpty()) {
+                userListModel.addElement(name);
+            }
         }
     }
 
